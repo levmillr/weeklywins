@@ -10,3 +10,17 @@ let html=emailHTML(draft);assert(!html.includes('<script>'));assert(!html.includ
 draft.theme='missing';assert.equal(normalizeDraft(draft).theme,'harvest');assert.throws(()=>normalizeDraft({}));
 for(const theme of ['harvest','cosmic','confetti','cozy']){draft.theme=theme;assert(emailHTML(draft).includes('WEEKLY WINS'));}
 console.log('Email escaping, safe URLs, team grouping, batch parsing, theme rendering, draft validation, and optional answers passed.');
+const {normalizeMedia,mediaSource,detectImageType,imageDimensions,vibeDraft}=require('../dist/app.js');
+const local='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const multi=newDraft();multi.wins=[{team:'Design',title:'Launch',body:'Shipped',media:[{src:local,alt:'First',name:'first.gif',caption:'First caption'},{src:'https://example.com/second.jpg',alt:'Second',caption:'Second caption'}]}];
+const restored=normalizeDraft(JSON.parse(JSON.stringify(multi)));
+assert.equal(restored.wins[0].media.length,2);assert.equal(restored.wins[0].media[0].src,local);
+const multiHTML=emailHTML(restored);assert(multiHTML.indexOf('First caption')<multiHTML.indexOf('Second caption'));
+const gmailHTML=emailHTML(restored,true);assert(!gmailHTML.includes('data:image'));assert(gmailHTML.includes('[Insert image: First]'));assert(gmailHTML.includes('https://example.com/second.jpg'));
+assert(!JSON.stringify(vibeDraft(restored)).includes('data:image'));assert.equal(vibeDraft(restored).wins[0].hasImage,true);
+assert.equal(normalizeMedia({image:'https://example.com/old.gif',imageAlt:'Old'}).length,1);
+assert.equal(normalizeMedia({media:[],image:'https://example.com/old.gif'}).length,0);
+assert.equal(mediaSource('data:image/svg+xml;base64,PHN2Zz4='),'');assert.equal(mediaSource('data:text/html;base64,AAAA'),'');
+assert.equal(detectImageType(Buffer.from('GIF89a')),'image/gif');assert.equal(detectImageType(Buffer.from('<svg>')),'');
+assert.deepEqual(imageDimensions(3200,2000),{width:1072,height:670});assert.deepEqual(imageDimensions(400,300),{width:400,height:300});assert.deepEqual(imageDimensions(1000,8000),{width:200,height:1600});
+console.log('Multiple media, legacy migration, draft round trips, Gmail upload markers, API media exclusion, image signatures, and resize bounds passed.');

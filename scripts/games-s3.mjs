@@ -1,0 +1,19 @@
+import {spawnSync} from 'node:child_process';
+import {readFileSync,mkdtempSync,writeFileSync,copyFileSync,mkdirSync,rmSync} from 'node:fs';
+import path from 'node:path';import os from 'node:os';import {fileURLToPath} from 'node:url';
+import C from '../dist/games/core.js';import E from '../dist/app.js';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),args=process.argv.slice(2),o={};
+for(let i=0;i<args.length;i+=2){if(!args[i]?.startsWith('--')||!args[i+1]||args[i+1].startsWith('--'))throw new Error('Pass named options and their values.');o[args[i].slice(2)]=args[i+1];}
+const allowed=new Set(['profile','region','account','bucket','website-url','puzzle']);if(Object.keys(o).some(k=>!allowed.has(k)))throw new Error('Unknown option.');
+if(!o.profile||!o.region||!/^\d{12}$/.test(o.account||'')||!o.bucket||!o.puzzle||!o['website-url']){console.error('Usage: node scripts/games-s3.mjs --profile NAME --region REGION --account ACCOUNT_ID --bucket BUCKET --website-url http://BUCKET.s3-website-REGION.amazonaws.com/ --puzzle /absolute/path/to/edition.json');process.exit(1);}
+function aws(args,json=false){const r=spawnSync('aws',[...args,'--profile',o.profile,'--region',o.region,'--no-cli-pager',...(json?['--output','json']:[])],{encoding:'utf8',env:{...process.env,AWS_PAGER:''}});if(r.error)throw r.error;if(r.status!==0)throw new Error(r.stderr.trim()||'AWS command failed.');if(json)return JSON.parse(r.stdout);if(r.stdout.trim())console.log(r.stdout.trim());}
+try{
+ const base=E.safeGameURL(o['website-url']);if(!base)throw new Error('Use the S3 website endpoint copied from your bucket’s Properties tab.');const endpoint=new URL(base);if(endpoint.protocol!=='http:'||!endpoint.hostname.startsWith(o.bucket+'.s3-website'))throw new Error('The website endpoint must match the requested S3 bucket.');endpoint.pathname='/';endpoint.search='';endpoint.hash='';
+ const p=C.validatePuzzle(JSON.parse(readFileSync(path.resolve(o.puzzle),'utf8')));const identity=aws(['sts','get-caller-identity'],true);if(identity.Account!==o.account)throw new Error('The AWS profile points to a different account. No files uploaded.');
+ aws(['s3api','head-bucket','--bucket',o.bucket,'--expected-bucket-owner',o.account]);const location=aws(['s3api','get-bucket-location','--bucket',o.bucket,'--expected-bucket-owner',o.account],true);const region=location.LocationConstraint==='EU'?'eu-west-1':location.LocationConstraint||'us-east-1';if(region!==o.region)throw new Error(`Bucket region is ${region}; update --region.`);
+ const website=aws(['s3api','get-bucket-website','--bucket',o.bucket,'--expected-bucket-owner',o.account],true);if(!website.IndexDocument||website.RedirectAllRequestsTo)throw new Error('This bucket must have static website hosting enabled without a whole-site redirect.');
+ console.log(`Uploading games only to s3://${o.bucket}/weekly-wins-games/`);
+ const temp=mkdtempSync(path.join(os.tmpdir(),'weekly-wins-s3-'));try{mkdirSync(path.join(temp,'editions'));for(const file of ['index.html','games.css','core.js','play.js'])copyFileSync(path.join(root,'dist/games',file),path.join(temp,file));writeFileSync(path.join(temp,'editions',p.id+'.json'),JSON.stringify(p));writeFileSync(path.join(temp,'editions','sample.json'),JSON.stringify(p));aws(['s3','sync',temp,`s3://${o.bucket}/weekly-wins-games/`,'--cache-control','public,max-age=60']);}finally{rmSync(temp,{recursive:true,force:true});}
+ const url=new URL('weekly-wins-games/index.html',endpoint);url.searchParams.set('edition',p.id);
+ console.log(`Game URL: ${url.href}`);console.log('Verify public access in the browser, then paste this URL into Published game URL. This uploader does not change bucket policies, public-access settings, or DNS.');
+}catch(error){console.error(error.message);process.exitCode=1;}

@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "date": "2026-10-08",
+  "title": "The weekly brain break",
+  "word": "LIGHT",
+  "hint": "It helps you see.",
+  "groups": [
+    {
+      "name": "Things with hands",
+      "words": [
+        "CLOCK",
+        "WATCH",
+        "PERSON",
+        "ROBOT"
+      ]
+    },
+    {
+      "name": "Shades of blue",
+      "words": [
+        "NAVY",
+        "TEAL",
+        "CYAN",
+        "AZURE"
+      ]
+    },
+    {
+      "name": "Things with keys",
+      "words": [
+        "PIANO",
+        "LOCK",
+        "KEYBOARD",
+        "HOTEL ROOM"
+      ]
+    },
+    {
+      "name": "Things you can fold",
+      "words": [
+        "LAUNDRY",
+        "PAPER",
+        "ARMS",
+        "CHAIR"
+      ]
+    }
+  ],
+  "id": "2026-10-08-d0f79b6b"
+}
